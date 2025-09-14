@@ -17,6 +17,8 @@ schema = "MortgageApplications"
 
 # Fixed input variables
 CHILD_COST_PER_MONTH = 3700
+MAX_PREDEFINED_CHILD_COUNT = 6
+SUPPORT_COST_PER_ADDITIONAL_CHILD = 1250
 STATE_TAX_THRESHOLD = 643100
 STATE_TAX_RATE = 0.2
 MAXIMUM_INTEREST_RATE = 0.20
@@ -28,6 +30,7 @@ MONTHS_OF_A_YEAR = 12
 INTEREST_RATE_SAFETY_MARGIN = 0.03
 MARGIN_OF_ERROR = 100
 MAX_PERCENTAGE_OF_PROPERTY_VALUATION = 0.85
+
 
 def load_data():
     """Load and prepare data from MySQL database"""
@@ -101,14 +104,14 @@ def amortization_rate(property_valuation, requested_loan, gross_yearly_income):
 
 def calculate_child_cost(num_children):
     """Calculate annual child cost"""
-    child_cost_lookup = {0: 0, 1: 1250, 2: 2650, 3: 4480, 4: 6740, 5: 9240, 6: 11740}
+    child_support_lookup = {0: 0, 1: 1250, 2: 2650, 3: 4480, 4: 6740, 5: 9240, 6: 11740}
     
     if num_children >= 7:
-        monthly_net_child_cost = 11740 + (num_children - 6) * 1250
+        monthly_child_support = child_support_lookup.get(MAX_PREDEFINED_CHILD_COUNT, 0) + (num_children - MAX_PREDEFINED_CHILD_COUNT) * SUPPORT_COST_PER_ADDITIONAL_CHILD
     else:
-        monthly_net_child_cost = child_cost_lookup.get(num_children, 0)
+        monthly_child_support = child_support_lookup.get(num_children, 0)
     
-    monthly_net_child_cost = CHILD_COST_PER_MONTH * num_children - monthly_net_child_cost
+    monthly_net_child_cost = CHILD_COST_PER_MONTH * num_children - monthly_child_support
     annual_net_child_cost = monthly_net_child_cost * MONTHS_OF_A_YEAR
     
     return annual_net_child_cost
@@ -205,7 +208,7 @@ def process_data(df, existing_loans_lookup, batch_size=10000):
     results = []
     
     total_batches = (len(df) + batch_size - 1) // batch_size
-    
+
     for batch_num in range(total_batches):
         start_idx = batch_num * batch_size
         end_idx = min((batch_num + 1) * batch_size, len(df))
@@ -251,10 +254,10 @@ if __name__ == "__main__":
     start_time = time.time()
     
     # Load data
-    df, existing_loans_lookup = load_data()
+    merged_data, existing_loans_lookup = load_data()
     
     # Process data
-    results = process_data(df, existing_loans_lookup, batch_size=10000)
+    results = process_data(merged_data, existing_loans_lookup, batch_size=10000)
     
     # Save results
     print("Saving results...")
